@@ -6,20 +6,27 @@ use http\Env\Response;
 use Illuminate\Http\Request;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Validator;
 
 class AuthController extends Controller
 {
     public function register(Request $request){
-        $fields = $request->validate([
-            'name'=>'required|string',
-            'email'=>'required|string|unique:users|email',
-            'password'=>'required|string|max:6|confirmed'
+        $validator = Validator::make($request->all(),[
+            'name' => 'required|max:191',
+            'email' => 'required|email|max:191|unique:users,email',
+            'password' => 'min:6|required_with:confirm_password|same:confirm_password',
         ]);
-        $user = User::create([
-            'name'=>$fields['name'],
-            'email'=>$fields['email'],
-            'password'=>bcrypt($fields['password']),
-        ]);
+        if($validator->fails()){
+            return response()->json([
+                'validator_errors' => $validator->getMessageBag(),
+            ]);
+        }else{
+            $user = User::create([
+                'name'=>$request->name,
+                'email'=>$request->email,
+                'password' => hash::make($request->password),
+            ]);
+        }
 
         $token = $user->createToken($user->email . 'token-name')->plainTextToken;
 
@@ -32,24 +39,31 @@ class AuthController extends Controller
     }
 
     public function login(Request $request){
-        $fields = $request->validate([
+        $validator = Validator::make($request->all(),[
             'email'=>'required|string',
             'password'=>'required|max:6',
         ]);
-        $user = User::where('email',$fields['email'])->first();
-
-        if(!$user || !Hash::check($fields['password'],$user->password)){
+        if($validator->fails())
+        {
             return response()->json([
-                'message'=>'Invalid Credentials'
-            ],401);
-        }else {
-            $token = $user->createToken($user->email . 'token-name')->plainTextToken;
-            return response()->json([
-                'status' => 200,
-                'username' => $user->name,
-                'token' => $token,
-                'message' => 'Logged In Successfully',
+                'validator_errors' => $validator->getMessageBag(),
             ]);
+        }else{
+            $user = User::where('email',$request->email)->first();
+
+            if(!$user || !Hash::check($request->password,$user->password)){
+                return response()->json([
+                    'message'=>'Invalid Credentials'
+                ],401);
+            }else {
+                $token = $user->createToken($user->email . 'token-name')->plainTextToken;
+                return response()->json([
+                    'status' => 200,
+                    'username' => $user->name,
+                    'token' => $token,
+                    'message' => 'Logged In Successfully',
+                ]);
+            }
         }
     }
 
