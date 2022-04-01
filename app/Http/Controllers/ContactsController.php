@@ -15,7 +15,7 @@ class ContactsController extends Controller
      */
     public function index()
     {
-        return contacts::all();
+        return contacts::paginate(5);
     }
 
     /**
